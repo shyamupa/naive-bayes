@@ -3,22 +3,26 @@ package Home;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
+import java.lang.Math;
 
 public class NaiveBayes implements Classifier 
 {
 	private DataSet trainSet;	// must have training data
-    private HashMap<String,Double> Priors;
-    private HashMap<String,HashMap<String,Double>> Likelihood; // first index is Label, second index is FeatureValue
-    private HashMap<String,Double>FeatureCount;
+    private HashMap<String,Double> Priors; // stores freq{label_i}
+    private HashMap<String,HashMap<String,Double>> Likelihood; // stores freq{label_i ^ FeatureVal_j}
+    //				Label_i			FeatureVal_j
+    private HashMap<String,Double>FeatureCount; // stores freq(FeatureVal_j)
+    
     public NaiveBayes(DataSet Train)
     {
     	trainSet=Train;
     }
 
-    // Prob of each label
+    // Finds the Priors for the Labels and Likelihoods in one pass over the dataset
     public void findPriorsAndLikelihood()
     {
     	HashMap<String,Double> h;
+    	// init the priors to 0
     	for(Label l : trainSet.getLabels())
     	{
     		Priors.put(l.getName(), 0.0);
@@ -28,14 +32,15 @@ public class NaiveBayes implements Classifier
     	{
     		Instance d=trainSet.getInstance(i);
     		String l=d.getLabel().getName();
-    		Priors.put(l,Priors.get(l)+1.0);
-    		h=Likelihood.get(l);
-    		for(Feature f: d.getFeatures())
+    		Priors.put(l,Priors.get(l)+1.0);	// increment the prior
+    		h=Likelihood.get(l);	// get the map for likelihood
+    		for(Feature f: d.getFeatures())	// iterate over features of the current instance
     		{
     			if(!h.containsKey(f.getValue()))	// no key with feature value present
     				h.put(f.getValue(),1.0);
     			else
-    				h.put(f.getValue(),h.get(f.getValue())+1.0);
+    				h.put(f.getValue(),h.get(f.getValue())+1.0);	// increment joint freq. count
+    			
     			if(!FeatureCount.containsKey(f.getValue()))
     				FeatureCount.put(f.getValue(),1.0);
     			else
@@ -47,53 +52,57 @@ public class NaiveBayes implements Classifier
     		}
     	}
     	
-    	for(Label l : trainSet.getLabels())
-    	{
-    		Priors.put(l.getName(),Priors.get(l.getName())/trainSet.getSize());
-    		//System.out.println(Priors.get(l.getName()));
-    	}
+//    	for(Label l : trainSet.getLabels())
+//    	{
+//    		Priors.put(l.getName(),Priors.get(l.getName())/trainSet.getSize());
+//    		System.out.println(Priors.get(l.getName()));
+//    	}
     }
-    public Double getLikelihood(String l, String FeatureVal)
+    public Double getLikelihood(String l, String FeatureVal) // returns Probability of Instance given the Label
     {
     	Double lh,temp;
     	HashMap<String,Double> h=Likelihood.get(l);
     	//System.out.println(h.get(FeatureVal)+":"+FeatureVal);
 
-    	if(h.get(FeatureVal)==null)
-    		temp=0.0;
+    	if(h.get(FeatureVal)==null)	// this label and featureVal pair never seen before
+		{
+    		//System.out.println("WHOOPS!!");
+			temp=1.0;	// use smoothing
+		}
     	else
     		temp=h.get(FeatureVal);
     		
-    	lh=temp/FeatureCount.get(FeatureVal);
+    	lh=temp/Priors.get(l); // Freq{FV_j ^ label_i}/Freq{label_i}
     	//System.out.println(lh);
     	return lh;
     }
     
     public Label classify(Instance i)
     {
-    	double max=0.0;
+    	double max=Double.NEGATIVE_INFINITY;
     	Label prediction=null;
-		for(Label l : trainSet.getLabels())
+		for(Label l : trainSet.getLabels()) // iterate over all labels
     	{
 			double prob = getPosterior(l,i);
 			if(prob > max)
 			{
-				max=prob;
-				prediction=l;
+				max=prob;	
+				prediction=l;	
 			}
     	}
+		//System.out.println("Prob is "+":"+max);
     	return prediction;
     }
     
     // finds P(Label | instance)
     private double getPosterior(Label label, Instance i)
     {
-    	double post=Priors.get(label.getName());
+    	double post=Math.log(getPrior(label.getName()));
     	// Bayes Theorem
     	// Posterior P (Label | instance) ~ Prior P(Label) * Likelihood P(instance | Label)
     	for(Feature f: i.getFeatures())
     	{
-    		post*=getLikelihood(label.getName(),f.getValue());
+    		post+=Math.log(getLikelihood(label.getName(),f.getValue()));
     		
     	}
     	return post;
@@ -101,6 +110,11 @@ public class NaiveBayes implements Classifier
     }
     
     
+	private double getPrior(String name) // returns true prior 
+	{
+		return Priors.get(name)/trainSet.getSize();
+	}
+
 	public void train() 
 	{
 		Priors=new HashMap<String, Double>(trainSet.getLabels().size());
@@ -129,7 +143,7 @@ public class NaiveBayes implements Classifier
 		NaiveBayes nb= new NaiveBayes(ds1);
 		nb.train();
 		//nb.getLikelihood(">50K", "Female");
-		DataSet ds2=new DataSet("data/test_data.txt");
+		DataSet ds2=new DataSet("data/test_data.bak");
 		nb.test(ds2);
 		//nb.getPosterior(">50K","Female");
 	}
