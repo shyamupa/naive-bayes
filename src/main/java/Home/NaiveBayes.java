@@ -2,7 +2,6 @@ package Home;
 
 import java.io.IOException;
 import java.util.HashMap;
-import java.util.Map;
 import java.lang.Math;
 
 public class NaiveBayes implements Classifier 
@@ -58,22 +57,19 @@ public class NaiveBayes implements Classifier
 //    		System.out.println(Priors.get(l.getName()));
 //    	}
     }
-    public Double getLikelihood(String l, String FeatureVal) // returns Probability of Instance given the Label
+    public Double getLikelihood(String l, CensusFeature f) // returns Probability of Instance given the Label
     {
     	Double lh,temp;
     	HashMap<String,Double> h=Likelihood.get(l);
     	//System.out.println(h.get(FeatureVal)+":"+FeatureVal);
 
-    	if(h.get(FeatureVal)==null)	// this label and featureVal pair never seen before
+    	
+		temp=1.0;	// use smoothing a la CS229 notes 2 Andrew Ng
+		if(h.get(f.getValue())!=null)	
 		{
-    		//System.out.println("WHOOPS!!");
-			temp=1.0;	// use smoothing
+			temp+=h.get(f.getValue());
 		}
-    	else
-    		temp=h.get(FeatureVal);
-    		
-    	lh=temp/Priors.get(l); // Freq{FV_j ^ label_i}/Freq{label_i}
-    	//System.out.println(lh);
+    	lh=temp/(Priors.get(l)+f.getPossibleValues()); // Freq{FV_j ^ label_i}+1/Freq{label_i}+No of possible values
     	return lh;
     }
     
@@ -102,7 +98,7 @@ public class NaiveBayes implements Classifier
     	// Posterior P (Label | instance) ~ Prior P(Label) * Likelihood P(instance | Label)
     	for(Feature f: i.getFeatures())
     	{
-    		post+=Math.log(getLikelihood(label.getName(),f.getValue()));
+    		post+=Math.log(getLikelihood(label.getName(),(CensusFeature) f));
     		
     	}
     	return post;
@@ -135,7 +131,7 @@ public class NaiveBayes implements Classifier
 	
 	public void test() 
 	{
-		
+		// wrong interface dude, change interface definition
 	}
 	public static void main( String[] args ) throws IOException
 	{
@@ -143,7 +139,7 @@ public class NaiveBayes implements Classifier
 		NaiveBayes nb= new NaiveBayes(ds1);
 		nb.train();
 		//nb.getLikelihood(">50K", "Female");
-		DataSet ds2=new DataSet("data/test_data.bak");
+		DataSet ds2=new DataSet("data/test_data.txt");
 		nb.test(ds2);
 		//nb.getPosterior(">50K","Female");
 	}
